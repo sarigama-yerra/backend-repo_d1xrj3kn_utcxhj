@@ -1,8 +1,12 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
+from database import create_document
+from schemas import Lead
 
-app = FastAPI()
+app = FastAPI(title="Startup Lead API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -14,7 +18,7 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"message": "Hello from FastAPI Backend!"}
+    return {"message": "Startup Lead Backend Running"}
 
 @app.get("/api/hello")
 def hello():
@@ -64,6 +68,24 @@ def test_database():
     
     return response
 
+# Request model for lead creation (allows partial overrides from frontend if needed)
+class LeadIn(BaseModel):
+    name: str
+    email: str
+    company: Optional[str] = None
+    message: Optional[str] = None
+    source: Optional[str] = None
+    consent: bool = True
+
+@app.post("/api/leads")
+def create_lead(lead: LeadIn):
+    try:
+        # Validate with schema then save
+        lead_doc = Lead(**lead.model_dump())
+        inserted_id = create_document("lead", lead_doc)
+        return {"ok": True, "id": inserted_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
